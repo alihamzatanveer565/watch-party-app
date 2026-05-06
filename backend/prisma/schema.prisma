@@ -1,0 +1,128 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ParticipantRole {
+  OWNER
+  PARTICIPANT
+}
+
+enum ParticipantStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  REMOVED
+}
+
+enum JoinRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  rooms        Room[]
+  participants RoomParticipant[]
+  messages     Message[]
+
+  @@map("users")
+}
+
+model Room {
+  id             String   @id @default(cuid())
+  name           String
+  description    String?
+  inviteCode     String   @unique
+  ownerId        String
+  youtubeUrl     String
+  youtubeVideoId String
+  currentTime    Float    @default(0)
+  isPlaying      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  owner        User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  participants RoomParticipant[]
+  joinRequests JoinRequest[]
+  messages     Message[]
+  events       RoomEvent[]
+
+  @@map("rooms")
+}
+
+model RoomParticipant {
+  id             String            @id @default(cuid())
+  roomId         String
+  userId         String?
+  guestSessionId String?
+  guestName      String?
+  role           ParticipantRole   @default(PARTICIPANT)
+  status         ParticipantStatus @default(PENDING)
+  socketId       String?
+  joinedAt       DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  room Room  @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([roomId, userId])
+  @@unique([roomId, guestSessionId])
+  @@map("room_participants")
+}
+
+model JoinRequest {
+  id             String            @id @default(cuid())
+  roomId         String
+  guestSessionId String?
+  userId         String?
+  guestName      String?
+  status         JoinRequestStatus @default(PENDING)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@map("join_requests")
+}
+
+model Message {
+  id             String    @id @default(cuid())
+  roomId         String
+  senderName     String
+  senderUserId   String?
+  guestSessionId String?
+  content        String
+  isRemoved      Boolean   @default(false)
+  removedBy      String?
+  removedAt      DateTime?
+  createdAt      DateTime  @default(now())
+
+  room   Room  @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  sender User? @relation(fields: [senderUserId], references: [id], onDelete: SetNull)
+
+  @@map("messages")
+}
+
+model RoomEvent {
+  id        String   @id @default(cuid())
+  roomId    String
+  eventType String
+  payload   Json
+  createdAt DateTime @default(now())
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@map("room_events")
+}
