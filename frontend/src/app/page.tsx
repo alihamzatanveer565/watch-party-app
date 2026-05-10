@@ -5,6 +5,9 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Button from '@/components/ui/Button';
 
+/** Public YouTube video for the landing “room preview” mockup (swap anytime). */
+const LANDING_PREVIEW_VIDEO_ID = 'zGRPON4FcBk';
+
 export default function LandingPage() {
   const router = useRouter();
   const [inviteCode, setInviteCode] = useState('');
@@ -42,11 +45,6 @@ export default function LandingPage() {
         <div className="absolute top-40 right-1/4 w-80 h-80 bg-blue-600/20 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative max-w-4xl mx-auto">
-          <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-1.5 mb-6">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-            <span className="text-sm text-white/70">Free • No account needed to join</span>
-          </div>
-
           <h1 className="text-5xl md:text-7xl font-black text-white leading-tight mb-6">
             Watch Together,{' '}
             <span className="bg-gradient-to-r from-violet-400 via-blue-400 to-cyan-400 bg-clip-text text-transparent">
@@ -85,9 +83,9 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Preview mockup */}
-      <section className="px-6 pb-20">
-        <div className="max-w-5xl mx-auto">
+      {/* Preview mockup — wide “browser tab” card; video uses cover sizing (no side bars) */}
+      <section className="px-4 sm:px-6 pb-20">
+        <div className="max-w-7xl mx-auto">
           <div className="rounded-2xl overflow-hidden border border-white/10 bg-navy-800/50 backdrop-blur-sm shadow-2xl shadow-black/50">
             {/* Fake titlebar */}
             <div className="flex items-center gap-2 px-4 py-3 border-b border-white/10 bg-navy-800">
@@ -96,18 +94,25 @@ export default function LandingPage() {
                 <div className="w-3 h-3 rounded-full bg-yellow-500/70" />
                 <div className="w-3 h-3 rounded-full bg-green-500/70" />
               </div>
-              <div className="flex-1 text-center text-xs text-white/30">watchparty.app/room/abc123</div>
+              <div className="flex-1 text-center text-xs text-white/30">watchparty.app/room/movie-night</div>
             </div>
             {/* Fake room UI */}
-            <div className="flex h-56 md:h-80">
-              <div className="flex-1 bg-black flex items-center justify-center relative">
-                <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-                <svg className="w-16 h-16 text-white/20" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-                <div className="absolute bottom-3 left-3 flex items-center gap-2">
+            <div className="flex h-[min(56vw,22rem)] md:h-[min(42vw,36rem)] min-h-[14rem]">
+              <div className="flex-1 min-w-0 bg-black relative overflow-hidden youtube-cover-host">
+                <div className="youtube-cover-surface">
+                  <iframe
+                    src={`https://www.youtube.com/embed/${LANDING_PREVIEW_VIDEO_ID}?autoplay=1&mute=1&loop=1&playlist=${LANDING_PREVIEW_VIDEO_ID}&controls=0&modestbranding=1&rel=0&playsinline=1&enablejsapi=0`}
+                    className="absolute inset-0 w-full h-full"
+                    allow="autoplay; encrypted-media"
+                    allowFullScreen
+                    title="Watch Party Preview"
+                    style={{ border: 'none', pointerEvents: 'none' }}
+                  />
+                </div>
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
+                <div className="absolute bottom-3 left-3 flex items-center gap-2 z-10">
                   <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                  <span className="text-xs text-white/70">LIVE</span>
+                  <span className="text-xs text-white/70 font-medium">LIVE</span>
                 </div>
               </div>
               <div className="w-48 md:w-64 border-l border-white/10 flex flex-col">

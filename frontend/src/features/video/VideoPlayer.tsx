@@ -30,6 +30,7 @@ export default function VideoPlayer({ videoState, isOwner, onPlay, onPause, onSe
   const lastStateRef    = useRef<number>(-1);
   const lastVideoIdRef  = useRef<string>('');
   const pendingVideoId  = useRef<string>('');   // always holds latest videoId for the API-ready callback
+  const videoStateRef   = useRef<VideoState | null>(null);  // latest videoState for onReady
   const onPlayRef       = useRef(onPlay);
   const onPauseRef      = useRef(onPause);
   const onSeekRef       = useRef(onSeek);
@@ -38,6 +39,7 @@ export default function VideoPlayer({ videoState, isOwner, onPlay, onPause, onSe
   useEffect(() => { onPlayRef.current  = onPlay;  }, [onPlay]);
   useEffect(() => { onPauseRef.current = onPause; }, [onPause]);
   useEffect(() => { onSeekRef.current  = onSeek;  }, [onSeek]);
+  useEffect(() => { videoStateRef.current = videoState; }, [videoState]);
 
   // ─── Create the YT.Player instance ────────────────────────────────────────
   const initPlayer = useCallback((videoId: string) => {
@@ -59,7 +61,12 @@ export default function VideoPlayer({ videoState, isOwner, onPlay, onPause, onSe
       },
       events: {
         onReady: (event: YTPlayerEvent) => {
-          event.target.seekTo(0, true);
+          const state = videoStateRef.current;
+          const t = state?.currentTime ?? 0;
+          event.target.seekTo(t, true);
+          if (!isOwner && state?.isPlaying) {
+            event.target.playVideo();
+          }
         },
         onStateChange: (event: YTPlayerEvent) => {
           if (isSyncingRef.current || !isOwner) return;

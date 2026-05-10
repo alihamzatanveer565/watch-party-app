@@ -1,7 +1,6 @@
 'use client';
 
 import { Participant } from '@/types';
-import Button from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
 
 interface ParticipantListProps {
@@ -97,12 +96,13 @@ function ParticipantRow({
       {canRemove && (
         <button
           onClick={() => onRemove(participant.id)}
-          className="opacity-0 group-hover:opacity-100 text-red-400/60 hover:text-red-400 transition-all text-xs p-1 rounded hover:bg-red-500/10"
+          className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium opacity-0 group-hover:opacity-100 text-white/50 hover:text-red-400 hover:bg-red-500/10 transition-all"
           title="Remove participant"
         >
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M22 10.5h-6m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM4 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 0110.374 21c-2.331 0-4.512-.645-6.374-1.766z" />
           </svg>
+          Remove
         </button>
       )}
     </div>

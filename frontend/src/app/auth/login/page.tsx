@@ -64,15 +64,22 @@ export default function LoginPage() {
               autoComplete="email"
               required
             />
-            <Input
-              label="Password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              autoComplete="current-password"
-              required
-            />
+            <div>
+              <Input
+                label="Password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                autoComplete="current-password"
+                required
+              />
+              <div className="flex justify-end mt-1.5">
+                <Link href="/auth/forgot-password" className="text-xs text-white/40 hover:text-violet-400 transition-colors">
+                  Forgot password?
+                </Link>
+              </div>
+            </div>
             <Button type="submit" loading={loading} className="w-full mt-2" size="lg">
               Sign in
             </Button>

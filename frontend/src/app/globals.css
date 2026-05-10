@@ -46,3 +46,20 @@ body {
   z-index: 1;
   pointer-events: none;
 }
+
+/**
+ * Full-bleed YouTube embed inside a rectangular cell (object-fit: cover behavior).
+ * Sizes a 16:9 surface to cover the host; overflow clips — no pillarboxing/letterboxing.
+ */
+.youtube-cover-host {
+  container-type: size;
+}
+
+.youtube-cover-surface {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: max(100cqw, calc(100cqh * 16 / 9));
+  height: max(100cqh, calc(100cqw * 9 / 16));
+  transform: translate(-50%, -50%);
+}

@@ -36,6 +36,16 @@ export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
     isOwner: boolean;
   }>();
 
+  // roomId -> unix-ms timestamp from which (Date.now() - t) / 1000 gives current playback position
+  private roomPlayStartTimes = new Map<string, number>();
+
+  private getEstimatedTime(roomId: string, savedTime: number, isPlaying: boolean): number {
+    if (!isPlaying) return savedTime;
+    const startedAt = this.roomPlayStartTimes.get(roomId);
+    if (startedAt === undefined) return savedTime;
+    return (Date.now() - startedAt) / 1000;
+  }
+
   constructor(
     private prisma: PrismaService,
     private chatService: ChatService,
@@ -126,9 +136,9 @@ export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
           room,
         });
 
-        // Send current video state
+        // Send current video state with estimated live position
         client.emit('video:sync', {
-          currentTime: room.currentTime,
+          currentTime: this.getEstimatedTime(room.id, room.currentTime, room.isPlaying),
           isPlaying: room.isPlaying,
           youtubeVideoId: room.youtubeVideoId,
         });
@@ -166,7 +176,7 @@ export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
           room,
         });
         client.emit('video:sync', {
-          currentTime: room.currentTime,
+          currentTime: this.getEstimatedTime(room.id, room.currentTime, room.isPlaying),
           isPlaying: room.isPlaying,
           youtubeVideoId: room.youtubeVideoId,
         });
@@ -264,7 +274,7 @@ export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
         room,
       });
       pendingSocket.emit('video:sync', {
-        currentTime: room.currentTime,
+        currentTime: this.getEstimatedTime(request.roomId, room.currentTime, room.isPlaying),
         isPlaying: room.isPlaying,
         youtubeVideoId: room.youtubeVideoId,
       });
@@ -303,6 +313,8 @@ export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const info = this.connectedSockets.get(client.id);
     if (!info?.isOwner) return;
 
+    // Record the real-world moment this position corresponds to, so late joiners can estimate live position
+    this.roomPlayStartTimes.set(info.roomId, Date.now() - data.currentTime * 1000);
     await this.roomsService.syncState(info.roomId, data.currentTime, true);
     client.to(info.roomId).emit('video:play', { currentTime: data.currentTime });
   }
@@ -315,6 +327,7 @@ export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const info = this.connectedSockets.get(client.id);
     if (!info?.isOwner) return;
 
+    this.roomPlayStartTimes.delete(info.roomId);
     await this.roomsService.syncState(info.roomId, data.currentTime, false);
     client.to(info.roomId).emit('video:pause', { currentTime: data.currentTime });
   }
@@ -327,6 +340,7 @@ export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const info = this.connectedSockets.get(client.id);
     if (!info?.isOwner) return;
 
+    this.roomPlayStartTimes.delete(info.roomId);
     await this.roomsService.syncState(info.roomId, data.currentTime, false);
     client.to(info.roomId).emit('video:seek', { currentTime: data.currentTime });
   }
@@ -339,6 +353,7 @@ export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const info = this.connectedSockets.get(client.id);
     if (!info?.isOwner) return;
 
+    this.roomPlayStartTimes.delete(info.roomId);
     await this.prisma.room.update({
       where: { id: info.roomId },
       data: { youtubeUrl: data.youtubeUrl, youtubeVideoId: data.youtubeVideoId, currentTime: 0, isPlaying: false },
@@ -356,7 +371,7 @@ export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (!room) return;
 
     client.emit('video:sync', {
-      currentTime: room.currentTime,
+      currentTime: this.getEstimatedTime(room.id, room.currentTime, room.isPlaying),
       isPlaying: room.isPlaying,
       youtubeVideoId: room.youtubeVideoId,
     });
@@ -398,7 +413,7 @@ export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (!info?.isOwner) return;
 
     const room = await this.prisma.room.findUnique({ where: { id: info.roomId } });
-    const updated = await this.chatService.removeMessage(data.messageId, info.userId || info.name, room.ownerId);
+    await this.chatService.removeMessage(data.messageId, info.userId || info.name, room.ownerId);
 
     this.server.to(info.roomId).emit('chat:delete', { messageId: data.messageId });
   }
