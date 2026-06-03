@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { Room, Participant, ChatMessage, JoinRequest, VideoState, RoomUserStatus } from '@/types';
+import { Room, Participant, ChatMessage, JoinRequest, VideoState, RoomUserStatus, RoomVisibility } from '@/types';
 import { authService } from '@/services/auth.service';
+import { roomsService } from '@/services/rooms.service';
 import toast from 'react-hot-toast';
 
 interface UseRoomOptions {
@@ -22,6 +23,9 @@ export function useRoom({ inviteCode, guestName }: UseRoomOptions) {
   const [participantId, setParticipantId] = useState<string | null>(null);
   const [isOwner, setIsOwner] = useState(false);
   const [removedMessage, setRemovedMessage] = useState<string | null>(null);
+  const [hostDisconnected, setHostDisconnected] = useState(false);
+  const [hostGraceSecondsLeft, setHostGraceSecondsLeft] = useState(0);
+  const graceIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const getSocket = useCallback(() => {
     if (!socketRef.current) {
@@ -108,6 +112,44 @@ export function useRoom({ inviteCode, guestName }: UseRoomOptions) {
       // participants update handled by room:participants-updated
     });
 
+    socket.on('room:host-disconnected', ({ gracePeriodSeconds }: { gracePeriodSeconds: number }) => {
+      setHostDisconnected(true);
+      setHostGraceSecondsLeft(gracePeriodSeconds);
+      if (graceIntervalRef.current) clearInterval(graceIntervalRef.current);
+      graceIntervalRef.current = setInterval(() => {
+        setHostGraceSecondsLeft((s) => {
+          if (s <= 1) {
+            clearInterval(graceIntervalRef.current!);
+            graceIntervalRef.current = null;
+            return 0;
+          }
+          return s - 1;
+        });
+      }, 1000);
+    });
+
+    socket.on('room:host-reconnected', () => {
+      setHostDisconnected(false);
+      setHostGraceSecondsLeft(0);
+      if (graceIntervalRef.current) { clearInterval(graceIntervalRef.current); graceIntervalRef.current = null; }
+    });
+
+    socket.on('room:host-changed', (data: { newOwnerId: string; newOwnerName: string; participantId: string }) => {
+      setHostDisconnected(false);
+      setHostGraceSecondsLeft(0);
+      if (graceIntervalRef.current) { clearInterval(graceIntervalRef.current); graceIntervalRef.current = null; }
+      toast(`${data.newOwnerName} is now the host`, { icon: '👑' });
+    });
+
+    socket.on('room:you-are-host', () => {
+      setIsOwner(true);
+      toast.success('You are now the host of this room!');
+    });
+
+    socket.on('room:visibility-changed', (data: { visibility: RoomVisibility }) => {
+      setRoom((prev) => prev ? { ...prev, visibility: data.visibility } : null);
+    });
+
     socket.on('error', (err: { message: string }) => {
       toast.error(err.message);
     });
@@ -127,6 +169,11 @@ export function useRoom({ inviteCode, guestName }: UseRoomOptions) {
       socket.off('video:sync');
       socket.off('video:change');
       socket.off('room:user-left');
+      socket.off('room:host-disconnected');
+      socket.off('room:host-reconnected');
+      socket.off('room:host-changed');
+      socket.off('room:you-are-host');
+      socket.off('room:visibility-changed');
       socket.off('error');
     };
   }, [getSocket]);
@@ -141,6 +188,7 @@ export function useRoom({ inviteCode, guestName }: UseRoomOptions) {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      if (graceIntervalRef.current) clearInterval(graceIntervalRef.current);
       socketRef.current?.disconnect();
       socketRef.current = null;
     };
@@ -188,6 +236,12 @@ export function useRoom({ inviteCode, guestName }: UseRoomOptions) {
     socketRef.current?.emit('video:request-sync');
   }, []);
 
+  const changeVisibility = useCallback(async (roomId: string, visibility: RoomVisibility) => {
+    await roomsService.updateVisibility(roomId, visibility);
+    setRoom((prev) => prev ? { ...prev, visibility } : null);
+    socketRef.current?.emit('room:visibility-changed', { visibility });
+  }, []);
+
   return {
     status,
     room,
@@ -198,6 +252,8 @@ export function useRoom({ inviteCode, guestName }: UseRoomOptions) {
     participantId,
     isOwner,
     removedMessage,
+    hostDisconnected,
+    hostGraceSecondsLeft,
     approveUser,
     rejectUser,
     sendMessage,
@@ -207,6 +263,7 @@ export function useRoom({ inviteCode, guestName }: UseRoomOptions) {
     videoPause,
     videoSeek,
     videoChange,
+    changeVisibility,
     requestSync,
     setMessages,
   };

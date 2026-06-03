@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import { VideoState } from '@/types';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -21,8 +21,6 @@ interface VideoPlayerProps {
   onSeek: (currentTime: number) => void;
 }
 
-let ytApiLoaded = false;
-
 export default function VideoPlayer({ videoState, isOwner, onPlay, onPause, onSeek }: VideoPlayerProps) {
   const playerRef       = useRef<any>(null);
   const containerRef    = useRef<HTMLDivElement>(null);
@@ -34,6 +32,7 @@ export default function VideoPlayer({ videoState, isOwner, onPlay, onPause, onSe
   const onPlayRef       = useRef(onPlay);
   const onPauseRef      = useRef(onPause);
   const onSeekRef       = useRef(onSeek);
+  const [playerReady, setPlayerReady] = useState(false);
 
   // Keep callback refs fresh so initPlayer never captures stale handlers
   useEffect(() => { onPlayRef.current  = onPlay;  }, [onPlay]);
@@ -61,6 +60,7 @@ export default function VideoPlayer({ videoState, isOwner, onPlay, onPause, onSe
       },
       events: {
         onReady: (event: YTPlayerEvent) => {
+          setPlayerReady(true);
           const state = videoStateRef.current;
           const t = state?.currentTime ?? 0;
           event.target.seekTo(t, true);
@@ -98,10 +98,10 @@ export default function VideoPlayer({ videoState, isOwner, onPlay, onPause, onSe
 
   // ─── Load YouTube IFrame API script once ──────────────────────────────────
   useEffect(() => {
-    if (!ytApiLoaded) {
-      ytApiLoaded = true;
-      const tag   = document.createElement('script');
-      tag.src     = 'https://www.youtube.com/iframe_api';
+    // Use a DOM check so we detect scripts preloaded by the parent page
+    if (!document.querySelector('script[src="https://www.youtube.com/iframe_api"]')) {
+      const tag = document.createElement('script');
+      tag.src   = 'https://www.youtube.com/iframe_api';
       document.head.appendChild(tag);
     }
 
@@ -195,6 +195,26 @@ export default function VideoPlayer({ videoState, isOwner, onPlay, onPause, onSe
         ref={containerRef}
         className="absolute inset-0 w-full h-full rounded-xl overflow-hidden bg-black"
       />
+
+      {/* No video loaded yet */}
+      {!videoState?.youtubeVideoId && (
+        <div className="absolute inset-0 bg-black flex flex-col items-center justify-center rounded-xl pointer-events-none">
+          <svg className="w-12 h-12 text-white/15 mb-3" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M8 5v14l11-7L8 5z"/>
+          </svg>
+          <p className="text-white/25 text-sm">No video loaded</p>
+          {isOwner && <p className="text-white/15 text-xs mt-1">Paste a YouTube URL above to start</p>}
+        </div>
+      )}
+
+      {/* Loading overlay — shown while YT player initialises */}
+      {videoState?.youtubeVideoId && !playerReady && (
+        <div className="absolute inset-0 bg-black flex flex-col items-center justify-center z-20 rounded-xl">
+          <div className="w-8 h-8 rounded-full border-2 border-violet-500 border-t-transparent animate-spin mb-3" />
+          <p className="text-white/40 text-xs">Loading video…</p>
+        </div>
+      )}
+
       {!isOwner && (
         <div
           className="absolute inset-0 z-10 cursor-not-allowed"

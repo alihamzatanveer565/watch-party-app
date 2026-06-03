@@ -241,6 +241,7 @@ Open **http://localhost:3000** and you're live.
 | `JWT_SECRET` | Secret key for signing JWTs | `a-long-random-string` |
 | `JWT_EXPIRES_IN` | Token expiry duration | `7d` |
 | `PORT` | Backend server port | `3001` |
+| `HOST` | Backend bind address | `127.0.0.1` |
 | `CORS_ORIGIN` | Allowed frontend origin | `http://localhost:3000` |
 
 ### Frontend — `frontend/.env.local`

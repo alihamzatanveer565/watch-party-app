@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateRoomDto, UpdateVideoDto } from './dto/room.dto';
+import { CreateRoomDto, UpdateVideoDto, RoomVisibility } from './dto/room.dto';
 import { customAlphabet } from 'nanoid';
 
 const nanoid = customAlphabet('abcdefghijklmnopqrstuvwxyz0123456789', 10);
@@ -33,6 +33,7 @@ export class RoomsService {
         ownerId,
         youtubeUrl: dto.youtubeUrl,
         youtubeVideoId: videoId,
+        visibility: dto.visibility ?? 'PRIVATE',
       },
     });
 
@@ -103,6 +104,42 @@ export class RoomsService {
     return this.prisma.joinRequest.findMany({
       where: { roomId, status: 'PENDING' },
       orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  async findPublicRooms() {
+    const rooms = await this.prisma.room.findMany({
+      where: { visibility: 'PUBLIC' },
+      orderBy: { updatedAt: 'desc' },
+      take: 20,
+      include: {
+        owner: { select: { id: true, name: true } },
+        // Count only participants with an active socket connection (truly online)
+        _count: { select: { participants: { where: { status: 'APPROVED', socketId: { not: null } } } } },
+      },
+    });
+    return rooms
+      .map((r) => ({
+        id: r.id,
+        name: r.name,
+        description: r.description,
+        inviteCode: r.inviteCode,
+        youtubeVideoId: r.youtubeVideoId,
+        visibility: r.visibility,
+        createdAt: r.createdAt,
+        updatedAt: r.updatedAt,
+        owner: r.owner,
+        participantCount: r._count.participants,
+      }))
+      .filter((r) => r.participantCount > 0); // Hide rooms where everyone has left
+  }
+
+  async updateVisibility(roomId: string, ownerId: string, visibility: RoomVisibility) {
+    const room = await this.findById(roomId);
+    if (room.ownerId !== ownerId) throw new ForbiddenException();
+    return this.prisma.room.update({
+      where: { id: roomId },
+      data: { visibility },
     });
   }
 }

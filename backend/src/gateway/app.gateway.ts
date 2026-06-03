@@ -39,6 +39,27 @@ export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
   // roomId -> unix-ms timestamp from which (Date.now() - t) / 1000 gives current playback position
   private roomPlayStartTimes = new Map<string, number>();
 
+  // roomId -> timer: 2-min grace period before host migration
+  private hostGraceTimers = new Map<string, NodeJS.Timeout>();
+
+  // roomId -> timer: 30-min before room is considered stale
+  private emptyRoomTimers = new Map<string, NodeJS.Timeout>();
+
+  // roomId -> debounce timer for participant list broadcasts
+  // Collapses rapid joins (e.g. 100 users joining at once) into a single DB query + broadcast
+  private participantUpdateTimers = new Map<string, NodeJS.Timeout>();
+
+  private scheduleParticipantsUpdate(roomId: string) {
+    const existing = this.participantUpdateTimers.get(roomId);
+    if (existing) clearTimeout(existing);
+    const timer = setTimeout(async () => {
+      this.participantUpdateTimers.delete(roomId);
+      const participants = await this.getApprovedParticipants(roomId);
+      this.server.to(roomId).emit('room:participants-updated', participants);
+    }, 150);
+    this.participantUpdateTimers.set(roomId, timer);
+  }
+
   private getEstimatedTime(roomId: string, savedTime: number, isPlaying: boolean): number {
     if (!isPlaying) return savedTime;
     const startedAt = this.roomPlayStartTimes.get(roomId);
@@ -63,7 +84,6 @@ export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     this.connectedSockets.delete(client.id);
 
-    // Clear socket from participant record
     try {
       await this.prisma.roomParticipant.update({
         where: { id: info.participantId },
@@ -75,6 +95,109 @@ export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
       participantId: info.participantId,
       name: info.name,
     });
+
+    if (info.isOwner) {
+      // Pause video immediately and save estimated position
+      const room = await this.prisma.room.findUnique({ where: { id: info.roomId } });
+      if (room) {
+        const estimatedTime = this.getEstimatedTime(room.id, room.currentTime, room.isPlaying);
+        this.roomPlayStartTimes.delete(info.roomId);
+        await this.roomsService.syncState(info.roomId, estimatedTime, false);
+        this.server.to(info.roomId).emit('video:pause', { currentTime: estimatedTime });
+      }
+
+      // Notify room and start 2-min grace period for host to reconnect
+      this.server.to(info.roomId).emit('room:host-disconnected', { gracePeriodSeconds: 120 });
+
+      const existing = this.hostGraceTimers.get(info.roomId);
+      if (existing) clearTimeout(existing);
+
+      const graceTimer = setTimeout(() => {
+        this.hostGraceTimers.delete(info.roomId);
+        this.migrateHost(info.roomId);
+      }, 120_000);
+      this.hostGraceTimers.set(info.roomId, graceTimer);
+    }
+
+    // If room is now empty, start 30-min stale timer
+    if (this.getOnlineCountForRoom(info.roomId) === 0) {
+      this.startEmptyRoomTimer(info.roomId);
+    }
+  }
+
+  private getOnlineCountForRoom(roomId: string): number {
+    let count = 0;
+    for (const info of this.connectedSockets.values()) {
+      if (info.roomId === roomId) count++;
+    }
+    return count;
+  }
+
+  private startEmptyRoomTimer(roomId: string) {
+    const existing = this.emptyRoomTimers.get(roomId);
+    if (existing) clearTimeout(existing);
+    // After 30 min empty the room is stale — findPublicRooms already filters by online count,
+    // so no DB action needed; timer just cleans up the map entry.
+    const timer = setTimeout(() => {
+      this.emptyRoomTimers.delete(roomId);
+    }, 30 * 60 * 1000);
+    this.emptyRoomTimers.set(roomId, timer);
+  }
+
+  private async migrateHost(roomId: string) {
+    // Collect sockets still in this room
+    const onlineSocketIds: string[] = [];
+    for (const [socketId, info] of this.connectedSockets.entries()) {
+      if (info.roomId === roomId && !info.isOwner) onlineSocketIds.push(socketId);
+    }
+
+    if (onlineSocketIds.length === 0) {
+      this.startEmptyRoomTimer(roomId);
+      return;
+    }
+
+    // Promote the longest-joined online participant
+    const candidate = await this.prisma.roomParticipant.findFirst({
+      where: { roomId, status: 'APPROVED', socketId: { in: onlineSocketIds } },
+      orderBy: { joinedAt: 'asc' },
+      include: { user: { select: { id: true, name: true } } },
+    });
+
+    if (!candidate || !candidate.socketId) {
+      this.startEmptyRoomTimer(roomId);
+      return;
+    }
+
+    await this.prisma.roomParticipant.update({
+      where: { id: candidate.id },
+      data: { role: 'OWNER' },
+    });
+
+    // Update DB ownerId only for registered users
+    if (candidate.userId) {
+      await this.prisma.room.update({
+        where: { id: roomId },
+        data: { ownerId: candidate.userId },
+      });
+    }
+
+    // Elevate in-memory socket entry
+    const socketInfo = this.connectedSockets.get(candidate.socketId);
+    if (socketInfo) {
+      this.connectedSockets.set(candidate.socketId, { ...socketInfo, isOwner: true });
+    }
+
+    const newOwnerName = candidate.user?.name || candidate.guestName || 'Participant';
+
+    this.server.to(roomId).emit('room:host-changed', {
+      newOwnerId: candidate.userId || candidate.guestSessionId,
+      newOwnerName,
+      participantId: candidate.id,
+    });
+
+    // Tell the new host directly
+    const newHostSocket = this.server.sockets.sockets.get(candidate.socketId);
+    newHostSocket?.emit('room:you-are-host', {});
   }
 
   // ─── Join flow ───────────────────────────────────────────────────────────────
@@ -128,6 +251,21 @@ export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
           isOwner: true,
         });
 
+        // Cancel grace period if owner reconnected in time
+        const graceTimer = this.hostGraceTimers.get(room.id);
+        if (graceTimer) {
+          clearTimeout(graceTimer);
+          this.hostGraceTimers.delete(room.id);
+          this.server.to(room.id).emit('room:host-reconnected', { ownerName: userName });
+        }
+
+        // Cancel empty room stale timer
+        const emptyTimer = this.emptyRoomTimers.get(room.id);
+        if (emptyTimer) {
+          clearTimeout(emptyTimer);
+          this.emptyRoomTimers.delete(room.id);
+        }
+
         client.join(room.id);
         client.emit('room:user-approved', {
           roomId: room.id,
@@ -136,15 +274,13 @@ export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
           room,
         });
 
-        // Send current video state with estimated live position
         client.emit('video:sync', {
           currentTime: this.getEstimatedTime(room.id, room.currentTime, room.isPlaying),
           isPlaying: room.isPlaying,
           youtubeVideoId: room.youtubeVideoId,
         });
 
-        const participants = await this.getApprovedParticipants(room.id);
-        this.server.to(room.id).emit('room:participants-updated', participants);
+        this.scheduleParticipantsUpdate(room.id);
         return;
       }
 
@@ -168,6 +304,10 @@ export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
           name: userName,
           isOwner: false,
         });
+
+        const emptyTimer = this.emptyRoomTimers.get(room.id);
+        if (emptyTimer) { clearTimeout(emptyTimer); this.emptyRoomTimers.delete(room.id); }
+
         client.join(room.id);
         client.emit('room:user-approved', {
           roomId: room.id,
@@ -180,14 +320,55 @@ export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
           isPlaying: room.isPlaying,
           youtubeVideoId: room.youtubeVideoId,
         });
-        const participants = await this.getApprovedParticipants(room.id);
-        this.server.to(room.id).emit('room:participants-updated', participants);
+        this.scheduleParticipantsUpdate(room.id);
         return;
       }
 
-      // New join request
+      // New join — determine identity
       const guestSessionId = userId ? undefined : nanoid();
 
+      // Auto-approve for PUBLIC and UNLISTED rooms
+      if (room.visibility === 'PUBLIC' || room.visibility === 'UNLISTED') {
+        const participant = await this.prisma.roomParticipant.create({
+          data: {
+            roomId: room.id,
+            userId: userId ?? undefined,
+            guestSessionId: guestSessionId ?? undefined,
+            guestName: userId ? undefined : userName,
+            role: 'PARTICIPANT',
+            status: 'APPROVED',
+            socketId: client.id,
+          },
+        });
+        this.connectedSockets.set(client.id, {
+          roomId: room.id,
+          participantId: participant.id,
+          userId,
+          guestSessionId,
+          name: userName,
+          isOwner: false,
+        });
+
+        const emptyTimer = this.emptyRoomTimers.get(room.id);
+        if (emptyTimer) { clearTimeout(emptyTimer); this.emptyRoomTimers.delete(room.id); }
+
+        client.join(room.id);
+        client.emit('room:user-approved', {
+          roomId: room.id,
+          participantId: participant.id,
+          isOwner: false,
+          room,
+        });
+        client.emit('video:sync', {
+          currentTime: this.getEstimatedTime(room.id, room.currentTime, room.isPlaying),
+          isPlaying: room.isPlaying,
+          youtubeVideoId: room.youtubeVideoId,
+        });
+        this.scheduleParticipantsUpdate(room.id);
+        return;
+      }
+
+      // PRIVATE room — join request queue (host approval required)
       const joinRequest = await this.prisma.joinRequest.create({
         data: {
           roomId: room.id,
@@ -279,8 +460,7 @@ export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
         youtubeVideoId: room.youtubeVideoId,
       });
 
-      const participants = await this.getApprovedParticipants(request.roomId);
-      this.server.to(request.roomId).emit('room:participants-updated', participants);
+      this.scheduleParticipantsUpdate(request.roomId);
     }
   }
 
@@ -448,6 +628,18 @@ export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     const participants = await this.getApprovedParticipants(ownerInfo.roomId);
     this.server.to(ownerInfo.roomId).emit('room:participants-updated', participants);
+  }
+
+  // ─── Room settings ───────────────────────────────────────────────────────────
+
+  @SubscribeMessage('room:visibility-changed')
+  async handleVisibilityChanged(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { visibility: string },
+  ) {
+    const info = this.connectedSockets.get(client.id);
+    if (!info?.isOwner) return;
+    this.server.to(info.roomId).emit('room:visibility-changed', { visibility: data.visibility });
   }
 
   // ─── Helpers ─────────────────────────────────────────────────────────────────

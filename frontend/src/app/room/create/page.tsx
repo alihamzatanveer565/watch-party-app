@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import { roomsService } from '@/services/rooms.service';
+import { RoomVisibility } from '@/types';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import toast from 'react-hot-toast';
@@ -16,6 +17,7 @@ export default function CreateRoomPage() {
   const [name, setName] = useState('');
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [description, setDescription] = useState('');
+  const [visibility, setVisibility] = useState<RoomVisibility>('PRIVATE');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -39,7 +41,7 @@ export default function CreateRoomPage() {
     if (Object.keys(errs).length) { setErrors(errs); return; }
     setLoading(true);
     try {
-      const room = await roomsService.create(name.trim(), youtubeUrl.trim(), description.trim() || undefined);
+      const room = await roomsService.create(name.trim(), youtubeUrl.trim(), description.trim() || undefined, visibility);
       toast.success('Room created!');
       router.push(`/room/${room.inviteCode}`);
     } catch (err: any) {
@@ -129,6 +131,28 @@ export default function CreateRoomPage() {
               />
             </div>
 
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-white/70">Room Visibility</label>
+              <div className="grid grid-cols-3 gap-2">
+                {visibilityOptions.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setVisibility(opt.value)}
+                    className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border text-center transition-all ${
+                      visibility === opt.value
+                        ? 'border-violet-500/60 bg-violet-500/10 text-white'
+                        : 'border-white/10 bg-white/5 text-white/40 hover:text-white/70 hover:border-white/20'
+                    }`}
+                  >
+                    <span className="text-lg">{opt.icon}</span>
+                    <span className="text-xs font-semibold">{opt.label}</span>
+                    <span className="text-[10px] leading-tight text-white/40">{opt.desc}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <Button type="submit" loading={loading} className="w-full" size="lg">
               Create Room & Get Invite Link
             </Button>
@@ -142,3 +166,9 @@ export default function CreateRoomPage() {
     </div>
   );
 }
+
+const visibilityOptions: { value: RoomVisibility; icon: string; label: string; desc: string }[] = [
+  { value: 'PUBLIC', icon: '🌐', label: 'Public', desc: 'Listed on home, anyone joins instantly' },
+  { value: 'UNLISTED', icon: '🔗', label: 'Unlisted', desc: 'Link only, auto-approved' },
+  { value: 'PRIVATE', icon: '🔒', label: 'Private', desc: 'Invite only, host approves' },
+];

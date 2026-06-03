@@ -5,6 +5,8 @@ export interface User {
   createdAt: string;
 }
 
+export type RoomVisibility = 'PUBLIC' | 'PRIVATE' | 'UNLISTED';
+
 export interface Room {
   id: string;
   name: string;
@@ -13,10 +15,24 @@ export interface Room {
   ownerId: string;
   youtubeUrl: string;
   youtubeVideoId: string;
+  visibility: RoomVisibility;
   currentTime: number;
   isPlaying: boolean;
   createdAt: string;
   owner?: Pick<User, 'id' | 'name' | 'email'>;
+}
+
+export interface PublicRoomCard {
+  id: string;
+  name: string;
+  description?: string;
+  inviteCode: string;
+  youtubeVideoId: string;
+  visibility: RoomVisibility;
+  createdAt: string;
+  updatedAt: string;
+  owner: Pick<User, 'id' | 'name'>;
+  participantCount: number;
 }
 
 export interface Participant {

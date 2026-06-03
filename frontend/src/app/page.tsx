@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Button from '@/components/ui/Button';
+import { roomsService } from '@/services/rooms.service';
+import type { PublicRoomCard as PublicRoomCardType } from '@/types';
 
 /** Public YouTube video for the landing “room preview” mockup (swap anytime). */
 const LANDING_PREVIEW_VIDEO_ID = 'zGRPON4FcBk';
@@ -11,6 +13,15 @@ const LANDING_PREVIEW_VIDEO_ID = 'zGRPON4FcBk';
 export default function LandingPage() {
   const router = useRouter();
   const [inviteCode, setInviteCode] = useState('');
+  const [publicRooms, setPublicRooms] = useState<PublicRoomCardType[]>([]);
+  const [roomsLoading, setRoomsLoading] = useState(true);
+
+  useEffect(() => {
+    roomsService.getPublicRooms()
+      .then(setPublicRooms)
+      .catch(() => {})
+      .finally(() => setRoomsLoading(false));
+  }, []);
 
   const handleJoin = () => {
     const code = inviteCode.trim();
@@ -137,6 +148,47 @@ export default function LandingPage() {
               </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Live public rooms */}
+      <section className="px-6 pb-20">
+        <div className="max-w-7xl mx-auto">
+          <div className="mb-8">
+            <h2 className="text-2xl md:text-3xl font-bold text-white">Live Rooms</h2>
+            <p className="text-white/40 text-sm mt-1">Jump into an ongoing watch party — no invite needed</p>
+          </div>
+
+          {roomsLoading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="rounded-2xl bg-white/5 border border-white/10 overflow-hidden animate-pulse">
+                  <div className="aspect-video bg-white/5" />
+                  <div className="p-4 space-y-2">
+                    <div className="h-4 bg-white/10 rounded w-3/4" />
+                    <div className="h-3 bg-white/5 rounded w-1/2" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : publicRooms.length === 0 ? (
+            <div className="text-center py-16 rounded-2xl bg-white/[0.02] border border-white/5">
+              <p className="text-white/30 text-sm">No public rooms right now.</p>
+              <Link href="/auth/signup" className="text-violet-400 hover:text-violet-300 text-sm mt-1 inline-block">
+                Be the first to start one!
+              </Link>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {publicRooms.map((room) => (
+                <PublicRoomCardUI
+                  key={room.id}
+                  room={room}
+                  onJoin={() => router.push(`/room/${room.inviteCode}`)}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
@@ -282,3 +334,43 @@ const steps = [
   { title: 'Invite friends', desc: 'Share the invite link. Guests join with just their name — no account needed.' },
   { title: 'Watch together', desc: 'Control play, pause, and seek for everyone. Chat in real-time and enjoy the show.' },
 ];
+
+function PublicRoomCardUI({ room, onJoin }: { room: PublicRoomCardType; onJoin: () => void }) {
+  return (
+    <div className="group rounded-2xl bg-white/5 border border-white/10 overflow-hidden hover:border-violet-500/40 transition-all duration-200 flex flex-col">
+      <div className="relative aspect-video bg-navy-800 overflow-hidden">
+        <img
+          src={`https://img.youtube.com/vi/${room.youtubeVideoId}/mqdefault.jpg`}
+          alt={room.name}
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          loading="lazy"
+        />
+        <div className="absolute top-2 right-2 flex items-center gap-1 bg-black/70 backdrop-blur-sm rounded-full px-2 py-0.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
+          <span className="text-[11px] text-white font-medium">{room.participantCount}</span>
+        </div>
+        <div className="absolute top-2 left-2 bg-violet-600/80 backdrop-blur-sm rounded-full px-2 py-0.5">
+          <span className="text-[10px] text-white font-semibold uppercase tracking-wide">Public</span>
+        </div>
+      </div>
+
+      <div className="p-4 flex flex-col flex-1 gap-3">
+        <div className="flex-1">
+          <h3 className="text-sm font-bold text-white truncate">{room.name}</h3>
+          {room.description && (
+            <p className="text-xs text-white/40 mt-1 line-clamp-2">{room.description}</p>
+          )}
+          <p className="text-xs text-white/30 mt-1.5">
+            by <span className="text-white/50">{room.owner.name}</span>
+          </p>
+        </div>
+        <button
+          onClick={onJoin}
+          className="w-full py-2 rounded-xl bg-violet-600/90 hover:bg-violet-600 text-white text-xs font-semibold transition-colors"
+        >
+          Join Now
+        </button>
+      </div>
+    </div>
+  );
+}

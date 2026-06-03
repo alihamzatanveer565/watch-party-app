@@ -25,6 +25,12 @@ enum JoinRequestStatus {
   REJECTED
 }
 
+enum RoomVisibility {
+  PUBLIC
+  PRIVATE
+  UNLISTED
+}
+
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
@@ -48,6 +54,7 @@ model Room {
   ownerId        String
   youtubeUrl     String
   youtubeVideoId String
+  visibility     RoomVisibility @default(PRIVATE)
   currentTime    Float    @default(0)
   isPlaying      Boolean  @default(false)
   createdAt      DateTime @default(now())

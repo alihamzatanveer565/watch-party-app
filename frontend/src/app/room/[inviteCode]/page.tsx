@@ -17,6 +17,16 @@ export default function RoomPage() {
 
   const { user, loading: authLoading } = useAuth();
 
+  // Preload YouTube IFrame API as early as possible so it's ready the moment the user
+  // gets approved — this eliminates the 2-4s black screen from lazy-loading the script.
+  useEffect(() => {
+    if (!document.querySelector('script[src="https://www.youtube.com/iframe_api"]')) {
+      const tag = document.createElement('script');
+      tag.src = 'https://www.youtube.com/iframe_api';
+      document.head.appendChild(tag);
+    }
+  }, []);
+
   const currentUserName = user?.name || guestNameParam || 'Guest';
 
   const {
@@ -38,7 +48,10 @@ export default function RoomPage() {
     videoPause,
     videoSeek,
     videoChange,
+    changeVisibility,
     setMessages,
+    hostDisconnected,
+    hostGraceSecondsLeft,
   } = useRoom({ inviteCode, guestName: guestNameParam });
 
   // Redirect guests who haven't entered a name
@@ -87,6 +100,8 @@ export default function RoomPage() {
         pendingRequests={pendingRequests}
         videoState={videoState}
         currentUserName={currentUserName}
+        hostDisconnected={hostDisconnected}
+        hostGraceSecondsLeft={hostGraceSecondsLeft}
         onPlay={videoPlay}
         onPause={videoPause}
         onSeek={videoSeek}
@@ -96,6 +111,7 @@ export default function RoomPage() {
         onRemoveParticipant={removeParticipant}
         onApprove={approveUser}
         onReject={rejectUser}
+        onVisibilityChange={(v) => changeVisibility(room.id, v)}
         onLeave={() => router.push('/')}
       />
     );

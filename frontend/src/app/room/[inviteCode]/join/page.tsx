@@ -79,8 +79,18 @@ export default function JoinPage() {
         <div className="rounded-2xl bg-white/5 border border-white/10 p-7">
           {/* Room info */}
           <div className="flex items-start gap-3 mb-6 pb-6 border-b border-white/10">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600/30 to-blue-600/30 border border-white/10 flex items-center justify-center flex-none">
-              <svg className="w-5 h-5 text-violet-400" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+            <div className="w-16 h-12 rounded-xl overflow-hidden flex-none bg-navy-800 border border-white/10">
+              {room?.youtubeVideoId ? (
+                <img
+                  src={`https://img.youtube.com/vi/${room.youtubeVideoId}/mqdefault.jpg`}
+                  alt="Video thumbnail"
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <svg className="w-5 h-5 text-violet-400" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                </div>
+              )}
             </div>
             <div>
               <h2 className="font-bold text-white text-base">{room?.name}</h2>
@@ -93,7 +103,18 @@ export default function JoinPage() {
             </div>
           </div>
 
-          <h3 className="text-sm font-semibold text-white mb-4">Enter your name to request access</h3>
+          {room?.visibility !== 'PRIVATE' && (
+            <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-xl bg-green-500/10 border border-green-500/20">
+              <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse flex-none" />
+              <span className="text-xs text-green-400 font-medium">
+                {room?.visibility === 'PUBLIC' ? 'Public room' : 'Unlisted room'} — you will join instantly
+              </span>
+            </div>
+          )}
+
+          <h3 className="text-sm font-semibold text-white mb-4">
+            {room?.visibility === 'PRIVATE' ? 'Enter your name to request access' : 'Enter your name to join'}
+          </h3>
 
           <form onSubmit={handleJoin} className="space-y-4">
             {error && (
@@ -105,19 +126,21 @@ export default function JoinPage() {
               label="Your name"
               value={guestName}
               onChange={(e) => { setGuestName(e.target.value); setError(''); }}
-              placeholder="How should the host know you?"
+              placeholder={room?.visibility === 'PRIVATE' ? 'How should the host know you?' : 'What should we call you?'}
               autoFocus
             />
             <Button type="submit" className="w-full" size="lg" disabled={!guestName.trim()}>
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
               </svg>
-              Request to Join
+              {room?.visibility === 'PRIVATE' ? 'Request to Join' : 'Join Room'}
             </Button>
           </form>
 
           <p className="text-center text-xs text-white/30 mt-4">
-            The host will approve or reject your request
+            {room?.visibility === 'PRIVATE'
+              ? 'The host will approve or reject your request'
+              : 'No approval needed — you will enter immediately'}
           </p>
         </div>
       </div>

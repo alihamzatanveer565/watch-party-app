@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { Room, Participant, ChatMessage, JoinRequest, VideoState } from '@/types';
+import { Room, Participant, ChatMessage, JoinRequest, VideoState, RoomVisibility } from '@/types';
 import VideoPlayer from '@/features/video/VideoPlayer';
 import ChatPanel from '@/features/chat/ChatPanel';
 import ParticipantList from '@/features/participants/ParticipantList';
@@ -19,6 +19,8 @@ interface RoomLayoutProps {
   pendingRequests: JoinRequest[];
   videoState: VideoState | null;
   currentUserName: string;
+  hostDisconnected: boolean;
+  hostGraceSecondsLeft: number;
   onPlay: (t: number) => void;
   onPause: (t: number) => void;
   onSeek: (t: number) => void;
@@ -28,6 +30,7 @@ interface RoomLayoutProps {
   onRemoveParticipant: (id: string) => void;
   onApprove: (requestId: string) => void;
   onReject: (requestId: string) => void;
+  onVisibilityChange: (visibility: RoomVisibility) => void;
   onLeave: () => void;
 }
 
@@ -42,6 +45,8 @@ export default function RoomLayout({
   pendingRequests,
   videoState,
   currentUserName,
+  hostDisconnected,
+  hostGraceSecondsLeft,
   onPlay,
   onPause,
   onSeek,
@@ -51,6 +56,7 @@ export default function RoomLayout({
   onRemoveParticipant,
   onApprove,
   onReject,
+  onVisibilityChange,
   onLeave,
 }: RoomLayoutProps) {
   const [tab, setTab] = useState<Tab>('chat');
@@ -73,6 +79,15 @@ export default function RoomLayout({
               HOST
             </span>
           )}
+          <span className={`hidden sm:flex text-[10px] font-bold px-2 py-0.5 rounded-full flex-none ${
+            room.visibility === 'PUBLIC'
+              ? 'text-green-400 bg-green-400/10'
+              : room.visibility === 'UNLISTED'
+              ? 'text-blue-400 bg-blue-400/10'
+              : 'text-white/30 bg-white/5'
+          }`}>
+            {room.visibility ?? 'PRIVATE'}
+          </span>
         </div>
 
         <div className="flex items-center gap-2">
@@ -93,6 +108,21 @@ export default function RoomLayout({
           </button>
         </div>
       </header>
+
+      {/* Host disconnected banner */}
+      {hostDisconnected && (
+        <div className="flex-none flex items-center justify-between gap-3 px-4 py-2 bg-amber-500/15 border-b border-amber-500/30 text-amber-300 text-sm">
+          <span className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse flex-none" />
+            Host disconnected — watch party paused. Waiting for host to return&hellip;
+          </span>
+          {hostGraceSecondsLeft > 0 && (
+            <span className="flex-none font-mono text-xs text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-full">
+              {Math.floor(hostGraceSecondsLeft / 60)}:{String(hostGraceSecondsLeft % 60).padStart(2, '0')}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Main content */}
       <div className="flex-1 flex overflow-hidden">
@@ -182,7 +212,12 @@ export default function RoomLayout({
                 {pendingRequests.length > 0 && (
                   <JoinRequestPanel requests={pendingRequests} onApprove={onApprove} onReject={onReject} />
                 )}
-                <OwnerControls onChangeVideo={onVideoChange} />
+                <OwnerControls
+                  onChangeVideo={onVideoChange}
+                  roomId={room.id}
+                  currentVisibility={room.visibility ?? 'PRIVATE'}
+                  onVisibilityChange={onVisibilityChange}
+                />
               </div>
             )}
 

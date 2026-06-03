@@ -1,6 +1,6 @@
 import { Controller, Post, Get, Patch, Body, Param, UseGuards, Request } from '@nestjs/common';
 import { RoomsService } from './rooms.service';
-import { CreateRoomDto, UpdateVideoDto } from './dto/room.dto';
+import { CreateRoomDto, UpdateVideoDto, UpdateVisibilityDto } from './dto/room.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @Controller('rooms')
@@ -19,6 +19,11 @@ export class RoomsController {
     return this.roomsService.getMyRooms(req.user.id);
   }
 
+  @Get('public')
+  getPublicRooms() {
+    return this.roomsService.findPublicRooms();
+  }
+
   @Get('invite/:code')
   findByInvite(@Param('code') code: string) {
     return this.roomsService.findByInviteCode(code);
@@ -33,6 +38,12 @@ export class RoomsController {
   @UseGuards(JwtAuthGuard)
   updateVideo(@Param('id') id: string, @Request() req, @Body() dto: UpdateVideoDto) {
     return this.roomsService.updateVideo(id, req.user.id, dto);
+  }
+
+  @Patch(':id/visibility')
+  @UseGuards(JwtAuthGuard)
+  updateVisibility(@Param('id') id: string, @Request() req, @Body() dto: UpdateVisibilityDto) {
+    return this.roomsService.updateVisibility(id, req.user.id, dto.visibility);
   }
 
   @Get(':id/participants')

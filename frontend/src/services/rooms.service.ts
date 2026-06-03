@@ -1,9 +1,9 @@
 import api from '@/lib/axios';
-import { Room } from '@/types';
+import { Room, PublicRoomCard, RoomVisibility } from '@/types';
 
 export const roomsService = {
-  async create(name: string, youtubeUrl: string, description?: string): Promise<Room> {
-    const { data } = await api.post<Room>('/rooms', { name, youtubeUrl, description });
+  async create(name: string, youtubeUrl: string, description?: string, visibility?: RoomVisibility): Promise<Room> {
+    const { data } = await api.post<Room>('/rooms', { name, youtubeUrl, description, visibility });
     return data;
   },
 
@@ -24,6 +24,16 @@ export const roomsService = {
 
   async updateVideo(roomId: string, youtubeUrl: string): Promise<Room> {
     const { data } = await api.patch<Room>(`/rooms/${roomId}/video`, { youtubeUrl });
+    return data;
+  },
+
+  async getPublicRooms(): Promise<PublicRoomCard[]> {
+    const { data } = await api.get<PublicRoomCard[]>('/rooms/public');
+    return data;
+  },
+
+  async updateVisibility(roomId: string, visibility: RoomVisibility): Promise<Room> {
+    const { data } = await api.patch<Room>(`/rooms/${roomId}/visibility`, { visibility });
     return data;
   },
 };
