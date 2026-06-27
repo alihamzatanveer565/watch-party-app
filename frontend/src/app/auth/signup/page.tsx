@@ -81,6 +81,7 @@ export default function SignupPage() {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Min. 6 characters"
               autoComplete="new-password"
+              passwordToggle
               required
             />
             <Button type="submit" loading={loading} className="w-full mt-2" size="lg">

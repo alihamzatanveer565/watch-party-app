@@ -72,6 +72,7 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 autoComplete="current-password"
+                passwordToggle
                 required
               />
               <div className="flex justify-end mt-1.5">
