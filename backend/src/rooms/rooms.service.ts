@@ -107,12 +107,20 @@ export class RoomsService {
     const requests = await this.prisma.joinRequest.findMany({
       where: { roomId, status: 'PENDING' },
       orderBy: { createdAt: 'asc' },
-      include: { user: { select: { name: true } } },
     });
+
+    const userIds = requests.map((r) => r.userId).filter((id): id is string => !!id);
+    const users = userIds.length
+      ? await this.prisma.user.findMany({
+          where: { id: { in: userIds } },
+          select: { id: true, name: true },
+        })
+      : [];
+    const userNames = new Map(users.map((u) => [u.id, u.name]));
 
     return requests.map((r) => ({
       requestId: r.id,
-      name: r.user?.name || r.guestName || 'Guest',
+      name: (r.userId && userNames.get(r.userId)) || r.guestName || 'Guest',
       guestSessionId: r.guestSessionId ?? undefined,
       userId: r.userId ?? undefined,
     }));
