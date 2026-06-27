@@ -100,11 +100,22 @@ export class RoomsService {
     });
   }
 
-  async getPendingRequests(roomId: string) {
-    return this.prisma.joinRequest.findMany({
+  async getPendingRequests(roomId: string, ownerId: string) {
+    const room = await this.prisma.room.findUnique({ where: { id: roomId } });
+    if (!room || room.ownerId !== ownerId) throw new ForbiddenException();
+
+    const requests = await this.prisma.joinRequest.findMany({
       where: { roomId, status: 'PENDING' },
       orderBy: { createdAt: 'asc' },
+      include: { user: { select: { name: true } } },
     });
+
+    return requests.map((r) => ({
+      requestId: r.id,
+      name: r.user?.name || r.guestName || 'Guest',
+      guestSessionId: r.guestSessionId ?? undefined,
+      userId: r.userId ?? undefined,
+    }));
   }
 
   async findPublicRooms() {

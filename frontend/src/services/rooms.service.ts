@@ -1,5 +1,5 @@
 import api from '@/lib/axios';
-import { Room, PublicRoomCard, RoomVisibility } from '@/types';
+import { Room, PublicRoomCard, RoomVisibility, JoinRequest } from '@/types';
 
 export const roomsService = {
   async create(name: string, youtubeUrl: string, description?: string, visibility?: RoomVisibility): Promise<Room> {
@@ -34,6 +34,11 @@ export const roomsService = {
 
   async updateVisibility(roomId: string, visibility: RoomVisibility): Promise<Room> {
     const { data } = await api.patch<Room>(`/rooms/${roomId}/visibility`, { visibility });
+    return data;
+  },
+
+  async getPendingRequests(roomId: string): Promise<JoinRequest[]> {
+    const { data } = await api.get<JoinRequest[]>(`/rooms/${roomId}/pending-requests`);
     return data;
   },
 };

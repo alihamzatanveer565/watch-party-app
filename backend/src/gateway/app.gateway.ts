@@ -391,8 +391,7 @@ export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       client.emit('room:join-pending', { requestId: joinRequest.id });
 
-      // Notify owner
-      this.server.to(room.id).emit('room:new-join-request', {
+      this.emitJoinRequestToOwners(room.id, {
         requestId: joinRequest.id,
         name: userName,
         guestSessionId,
@@ -644,6 +643,23 @@ export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+  /** Notify room owners — direct socket emit survives reconnect/proxy edge cases. */
+  private emitJoinRequestToOwners(
+    roomId: string,
+    payload: { requestId: string; name: string; guestSessionId?: string; userId?: string },
+  ) {
+    let notified = false;
+    for (const [socketId, info] of this.connectedSockets.entries()) {
+      if (info.roomId === roomId && info.isOwner) {
+        this.server.sockets.sockets.get(socketId)?.emit('room:new-join-request', payload);
+        notified = true;
+      }
+    }
+    if (!notified) {
+      this.server.to(roomId).emit('room:new-join-request', payload);
+    }
+  }
 
   private findPendingSocket(requestId: string): Socket | null {
     for (const [socketId, _] of this.server.sockets.sockets) {

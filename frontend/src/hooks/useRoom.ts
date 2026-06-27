@@ -27,6 +27,7 @@ export function useRoom({ inviteCode, guestName, authReady = true }: UseRoomOpti
   const [hostDisconnected, setHostDisconnected] = useState(false);
   const [hostGraceSecondsLeft, setHostGraceSecondsLeft] = useState(0);
   const graceIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const joinedRef = useRef(false);
 
   const getSocket = useCallback(() => {
     if (!socketRef.current) {
@@ -61,6 +62,7 @@ export function useRoom({ inviteCode, guestName, authReady = true }: UseRoomOpti
     const socket = getSocket();
 
     socket.on('room:user-approved', (data: { roomId: string; participantId: string; isOwner: boolean; room: Room }) => {
+      joinedRef.current = true;
       setRoom(data.room);
       setParticipantId(data.participantId);
       setIsOwner(data.isOwner);
@@ -82,7 +84,9 @@ export function useRoom({ inviteCode, guestName, authReady = true }: UseRoomOpti
     });
 
     socket.on('room:new-join-request', (req: JoinRequest) => {
-      setPendingRequests((prev) => [...prev, req]);
+      setPendingRequests((prev) =>
+        prev.some((r) => r.requestId === req.requestId) ? prev : [...prev, req],
+      );
       toast('New join request from ' + req.name, { icon: '👋' });
     });
 
@@ -171,7 +175,20 @@ export function useRoom({ inviteCode, guestName, authReady = true }: UseRoomOpti
       toast.error('Could not connect to the server. Please refresh the page.');
     });
 
+    // Re-join after Socket.IO reconnects (common behind LiteSpeed/nginx proxies)
+    const onReconnect = () => {
+      if (!joinedRef.current) return;
+      const token = authService.getToken();
+      socket.emit('room:join-request', {
+        inviteCode,
+        guestName,
+        ...(token ? { token } : {}),
+      });
+    };
+    socket.io.on('reconnect', onReconnect);
+
     return () => {
+      socket.io.off('reconnect', onReconnect);
       socket.off('room:user-approved');
       socket.off('room:user-rejected');
       socket.off('room:removed');
@@ -194,7 +211,7 @@ export function useRoom({ inviteCode, guestName, authReady = true }: UseRoomOpti
       socket.off('error');
       socket.off('connect_error');
     };
-  }, [getSocket]);
+  }, [getSocket, inviteCode, guestName]);
 
   // Auto-join once auth is resolved and we have identity (logged-in user or guest name)
   useEffect(() => {
@@ -203,6 +220,21 @@ export function useRoom({ inviteCode, guestName, authReady = true }: UseRoomOpti
       sendJoinRequest();
     }
   }, [inviteCode, guestName, authReady, sendJoinRequest]);
+
+  // Poll pending join requests for hosts (fallback when socket event is missed)
+  useEffect(() => {
+    if (status !== 'approved' || !isOwner || !room?.id) return;
+
+    const loadPending = () => {
+      roomsService.getPendingRequests(room.id)
+        .then(setPendingRequests)
+        .catch(() => {});
+    };
+
+    loadPending();
+    const interval = setInterval(loadPending, 5000);
+    return () => clearInterval(interval);
+  }, [status, isOwner, room?.id]);
 
   // Cleanup on unmount
   useEffect(() => {

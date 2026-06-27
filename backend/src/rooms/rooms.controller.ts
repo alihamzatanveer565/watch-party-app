@@ -53,7 +53,7 @@ export class RoomsController {
 
   @Get(':id/pending-requests')
   @UseGuards(JwtAuthGuard)
-  getPendingRequests(@Param('id') id: string) {
-    return this.roomsService.getPendingRequests(id);
+  getPendingRequests(@Param('id') id: string, @Request() req) {
+    return this.roomsService.getPendingRequests(id, req.user.id);
   }
 }
