@@ -10,9 +10,10 @@ import toast from 'react-hot-toast';
 interface UseRoomOptions {
   inviteCode: string;
   guestName?: string;
+  authReady?: boolean;
 }
 
-export function useRoom({ inviteCode, guestName }: UseRoomOptions) {
+export function useRoom({ inviteCode, guestName, authReady = true }: UseRoomOptions) {
   const socketRef = useRef<Socket | null>(null);
   const [status, setStatus] = useState<RoomUserStatus>('idle');
   const [room, setRoom] = useState<Room | null>(null);
@@ -31,7 +32,7 @@ export function useRoom({ inviteCode, guestName }: UseRoomOptions) {
     if (!socketRef.current) {
       socketRef.current = io(
         process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001',
-        { transports: ['websocket'] },
+        { transports: ['websocket', 'polling'] },
       );
     }
     return socketRef.current;
@@ -40,8 +41,20 @@ export function useRoom({ inviteCode, guestName }: UseRoomOptions) {
   const sendJoinRequest = useCallback(() => {
     const socket = getSocket();
     const token = authService.getToken();
-    socket.emit('room:join-request', { inviteCode, guestName, token });
-    setStatus('pending');
+
+    const doJoin = () => {
+      socket.emit('room:join-request', {
+        inviteCode,
+        guestName,
+        ...(token ? { token } : {}),
+      });
+    };
+
+    if (socket.connected) {
+      doJoin();
+    } else {
+      socket.once('connect', doJoin);
+    }
   }, [inviteCode, guestName, getSocket]);
 
   useEffect(() => {
@@ -154,6 +167,10 @@ export function useRoom({ inviteCode, guestName }: UseRoomOptions) {
       toast.error(err.message);
     });
 
+    socket.on('connect_error', () => {
+      toast.error('Could not connect to the server. Please refresh the page.');
+    });
+
     return () => {
       socket.off('room:user-approved');
       socket.off('room:user-rejected');
@@ -175,15 +192,17 @@ export function useRoom({ inviteCode, guestName }: UseRoomOptions) {
       socket.off('room:you-are-host');
       socket.off('room:visibility-changed');
       socket.off('error');
+      socket.off('connect_error');
     };
   }, [getSocket]);
 
-  // Auto-join on mount
+  // Auto-join once auth is resolved and we have identity (logged-in user or guest name)
   useEffect(() => {
+    if (!authReady) return;
     if (inviteCode && (guestName || authService.getToken())) {
       sendJoinRequest();
     }
-  }, [inviteCode, guestName, sendJoinRequest]);
+  }, [inviteCode, guestName, authReady, sendJoinRequest]);
 
   // Cleanup on unmount
   useEffect(() => {

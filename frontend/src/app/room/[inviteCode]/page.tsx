@@ -52,7 +52,7 @@ export default function RoomPage() {
     setMessages,
     hostDisconnected,
     hostGraceSecondsLeft,
-  } = useRoom({ inviteCode, guestName: guestNameParam });
+  } = useRoom({ inviteCode, guestName: guestNameParam, authReady: !authLoading });
 
   // Redirect guests who haven't entered a name
   useEffect(() => {

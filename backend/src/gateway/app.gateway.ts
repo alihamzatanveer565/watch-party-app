@@ -293,6 +293,7 @@ export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }
 
       if (existingParticipant) {
+        const isOwner = existingParticipant.role === 'OWNER' || userId === room.ownerId;
         await this.prisma.roomParticipant.update({
           where: { id: existingParticipant.id },
           data: { socketId: client.id },
@@ -302,7 +303,7 @@ export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
           participantId: existingParticipant.id,
           userId,
           name: userName,
-          isOwner: false,
+          isOwner,
         });
 
         const emptyTimer = this.emptyRoomTimers.get(room.id);
@@ -312,7 +313,7 @@ export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
         client.emit('room:user-approved', {
           roomId: room.id,
           participantId: existingParticipant.id,
-          isOwner: false,
+          isOwner,
           room,
         });
         client.emit('video:sync', {
