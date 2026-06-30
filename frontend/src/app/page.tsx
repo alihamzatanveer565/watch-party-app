@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import BrandLogo from '@/components/BrandLogo';
 import Button from '@/components/ui/Button';
 import { roomsService } from '@/services/rooms.service';
 import type { PublicRoomCard as PublicRoomCardType } from '@/types';
@@ -33,14 +34,7 @@ export default function LandingPage() {
     <div className="min-h-screen bg-navy-900 overflow-x-hidden">
       {/* Nav */}
       <nav className="fixed top-0 inset-x-0 z-40 flex items-center justify-between px-6 py-4 bg-navy-900/80 backdrop-blur-md border-b border-white/5">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-600 to-blue-600 flex items-center justify-center">
-            <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M8 5v14l11-7z" />
-            </svg>
-          </div>
-          <span className="font-bold text-white text-lg">WatchParty</span>
-        </div>
+        <BrandLogo />
         <div className="flex items-center gap-3">
           <Link href="/auth/login" className="text-sm text-white/60 hover:text-white transition-colors">Log in</Link>
           <Link href="/auth/signup">
@@ -105,7 +99,7 @@ export default function LandingPage() {
                 <div className="w-3 h-3 rounded-full bg-yellow-500/70" />
                 <div className="w-3 h-3 rounded-full bg-green-500/70" />
               </div>
-              <div className="flex-1 text-center text-xs text-white/30">watchparty.app/room/movie-night</div>
+              <div className="flex-1 text-center text-xs text-white/30">onionfarms.com/room/movie-night</div>
             </div>
             {/* Fake room UI */}
             <div className="flex h-[min(56vw,22rem)] md:h-[min(42vw,36rem)] min-h-[14rem]">
@@ -116,7 +110,7 @@ export default function LandingPage() {
                     className="absolute inset-0 w-full h-full"
                     allow="autoplay; encrypted-media"
                     allowFullScreen
-                    title="Watch Party Preview"
+                    title="Onion Farms Preview"
                     style={{ border: 'none', pointerEvents: 'none' }}
                   />
                 </div>
@@ -248,7 +242,7 @@ export default function LandingPage() {
           <p className="text-white/45 mb-8">Create a free room in seconds. No credit card needed.</p>
           <Link href="/auth/signup">
             <Button size="lg">
-              Start Your Watch Party
+              Start Watching Together
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
               </svg>
@@ -259,7 +253,7 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="border-t border-white/5 px-6 py-6 text-center text-xs text-white/20">
-        © {new Date().getFullYear()} WatchParty. Made with ❤️ for movie nights.
+        © {new Date().getFullYear()} Onion Farms. Made with 🧅 for movie nights.
       </footer>
     </div>
   );

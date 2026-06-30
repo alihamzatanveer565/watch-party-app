@@ -3,13 +3,14 @@ import { Toaster } from 'react-hot-toast';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Watch Party — Watch Together, Live',
+  title: 'Onion Farms — Watch Together, Live',
   description: 'Host synchronized YouTube watch parties with friends. Real-time chat, sync controls, and easy invite links.',
-  keywords: 'watch party, youtube sync, watch together, live chat',
+  keywords: 'onion farms, watch party, youtube sync, watch together, live chat',
   openGraph: {
-    title: 'Watch Party',
+    title: 'Onion Farms',
     description: 'Watch YouTube videos together in perfect sync',
     type: 'website',
+    images: '/brand/logo.gif',
   },
 };
 

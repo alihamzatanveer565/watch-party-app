@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import { roomsService } from '@/services/rooms.service';
 import { RoomVisibility } from '@/types';
+import BrandLogo from '@/components/BrandLogo';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import toast from 'react-hot-toast';
@@ -72,12 +73,7 @@ export default function CreateRoomPage() {
             </svg>
             Back
           </Link>
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-md bg-gradient-to-br from-violet-600 to-blue-600 flex items-center justify-center">
-              <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
-            </div>
-            <span className="text-sm font-semibold text-white/70">WatchParty</span>
-          </div>
+          <BrandLogo size="sm" href="/" />
         </div>
 
         <div className="rounded-2xl bg-white/5 border border-white/10 p-7">

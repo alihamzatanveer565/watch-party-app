@@ -24,7 +24,7 @@ async function bootstrap() {
   const port = process.env.PORT || 3001;
   const host = process.env.HOST || '127.0.0.1';
   await app.listen(port, host);
-  console.log(`Watch Party backend running on http://${host}:${port}`);
+  console.log(`Onion Farms backend running on http://${host}:${port}`);
 }
 
 bootstrap();

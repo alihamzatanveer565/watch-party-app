@@ -2,6 +2,7 @@
 
 import { useState, FormEvent } from 'react';
 import Link from 'next/link';
+import BrandLogo from '@/components/BrandLogo';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 
@@ -27,12 +28,7 @@ export default function ForgotPasswordPage() {
 
       <div className="relative w-full max-w-md">
         <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-2 mb-6">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-600 to-blue-600 flex items-center justify-center">
-              <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
-            </div>
-            <span className="font-bold text-white">WatchParty</span>
-          </Link>
+          <BrandLogo href="/" className="mb-6" />
           <h1 className="text-2xl font-bold text-white">Reset your password</h1>
           <p className="text-white/45 text-sm mt-1">We'll send you a link to reset it</p>
         </div>

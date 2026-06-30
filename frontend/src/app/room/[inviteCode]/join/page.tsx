@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { roomsService } from '@/services/rooms.service';
 import { authService } from '@/services/auth.service';
 import { Room } from '@/types';
+import BrandLogo from '@/components/BrandLogo';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 
@@ -68,12 +69,7 @@ export default function JoinPage() {
 
       <div className="relative w-full max-w-md">
         <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-2 mb-6">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-600 to-blue-600 flex items-center justify-center">
-              <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
-            </div>
-            <span className="font-bold text-white">WatchParty</span>
-          </Link>
+          <BrandLogo href="/" className="mb-6" />
         </div>
 
         <div className="rounded-2xl bg-white/5 border border-white/10 p-7">
